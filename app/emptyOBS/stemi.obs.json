@@ -1,0 +1,97 @@
+{
+    "resourceType": "Observation",
+    "id": "anObservation",
+    "code": {
+        "coding": [
+            {
+                "system": "http://loinc.org",
+                "code": "28010-7",
+                "display": "EKG Report (narrative)"
+            }
+        ]
+    },
+    "status": "final",
+    "component": [
+        {
+            "code": {
+                "coding": [
+                    {
+                        "system": "http://loinc.org",
+                        "code": "58258-5",
+                        "display": "Myocardial infarction"
+                    }
+                ]
+            },
+            "interpretation": [
+                {
+                    "coding": [
+                        {
+                            "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                            "code": "A",
+                            "display": "Abnormal"
+                        }
+                    ]
+                }
+            ],
+            "referenceRange": [
+                {
+                    "high": {
+                        "value": 50,
+                        "unit": "%",
+                        "system": "http://unitsofmeasure.org",
+                        "code": "%"
+                    }
+                }
+            ],
+            "valueQuantity": {
+                "code": "%",
+                "system": "http://unitsofmeasure.org",
+                "unit": "%",
+                "value": 0
+            }
+        },
+        {
+            "code": {
+                "coding": [
+                    {
+                        "code": "LA17084-7",
+                        "display": "Atrial fibrillation",
+                        "system": "http://loinc.org"
+                    }
+                ]
+            },
+            "interpretation": [
+                {
+                    "coding": [
+                        {
+                            "code": "N",
+                            "display": "Normal",
+                            "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation"
+                        }
+                    ]
+                }
+            ],
+            "referenceRange": [
+                {
+                    "high": {
+                        "code": "%",
+                        "system": "http://unitsofmeasure.org",
+                        "unit": "%",
+                        "value": 50
+                    }
+                }
+            ],
+            "valueQuantity": {
+                "code": "%",
+                "system": "http://unitsofmeasure.org",
+                "unit": "%",
+                "value": 0
+            }
+        }
+    ],
+    "note": [
+        {
+            "text": ""
+        }
+    ]
+}

@@ -1,0 +1,58 @@
+uvicorn==0.23.2
+fastapi==0.104.0
+# aiofiles
+numpy==1.26.1
+python-multipart==0.0.6
+psycopg2==2.9.9
+# pandas
+python-jose==3.3.0
+# minio
+pydicom
+# pynetdicom
+openpyxl==3.1.2
+fhirclient==4.1.0
+pymupdf
+xmltodict
+pillow==10.1.0
+# googletrans
+protobuf==3.17.1
+grpcio
+matplotlib
+pytz
+apscheduler==3.10.4
+sqlalchemy==1.4.49
+sqlmodel==0.0.9
+asyncpg
+passlib
+bcrypt==4.0.1
+pandas 
+joblib
+scikit-learn==1.2.2
+
+### iAST
+nmrglue
+lightgbm
+
+pymongo
+datetime
+
+### sepsis
+xgboost==1.4.2
+
+## CAD
+xmltodict==0.12.0
+
+## CTCAE
+bs4
+SQLAlchemy-Utils==0.41.2
+selenium
+webdriver-manager
+requests
+
+## ARDS
+opencv-python
+celery[mongodb]==5.3.5
+
+## iIDeAS
+catboost==1.2.7
+# scikit-learn==1.4.1.post1

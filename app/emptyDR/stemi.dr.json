@@ -1,0 +1,37 @@
+{
+    "resourceType": "DiagnosticReport",
+    "basedOn": [],
+    "code": {
+        "coding": [
+            {
+                "system": "http://loinc.org",
+                "code": "28010-7",
+                "display": "EKG Report (narrative)"
+            }
+        ]
+    },
+    "performer": [
+        {
+            "identifier": {
+                "type": {
+                    "coding": [
+                        {
+                            "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                            "code": "XX",
+                            "display": "Organization identifier"
+                        }
+                    ]
+                },
+                "system": "https://cmuh.org.tw/department",
+                "value": "1MC0"
+            }
+        },
+        {
+            "identifier": {
+                "system": "http://cmuh-aic-model",
+                "value": "STEMI"
+            }
+        }
+    ],
+    "status": "registered"
+}
