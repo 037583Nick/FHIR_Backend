@@ -239,7 +239,7 @@ python test_login.py
 | 變數名稱 | 描述 | 預設值 | 必要性 |
 |---------|------|--------|--------|
 | `FHIR_SERVER_URL` | FHIR 伺服器位址 | `http://10.69.12.83:8080/` | ✅ 必要 |
-| `GRPC_SERVER_ADDRESS` | AI 推論伺服器位址 | `10.21.98.80:8001` | ✅ 必要 |
+| `GRPC_SERVER_ADDRESS` | AI 推論伺服器位址 | `10.69.12.83:8006` | ✅ 必要 |
 | `HAPIFHIR_postgres` | PostgreSQL 資料庫 | `10.69.12.83:8008` | ✅ 必要 |
 | `MONGO_MAINURI` | MongoDB 主要伺服器 | `10.65.51.240:27017` | ✅ 必要 |
 | `MONGO_BACKUPURI` | MongoDB 備援伺服器 | `10.65.51.237:27017` | 🔶 建議 |
@@ -270,7 +270,7 @@ export HAPIFHIR_postgres="10.69.12.83:8008"
 export FHIR_SERVER_URL="http://10.69.12.83:8080/"
 
 # AI 推論伺服器 (新增)
-export GRPC_SERVER_ADDRESS="10.21.98.80:8001"
+export GRPC_SERVER_ADDRESS="10.69.12.83:8006"
 
 # MongoDB (主要)
 export MONGO_MAINURI="10.65.51.240:27017"

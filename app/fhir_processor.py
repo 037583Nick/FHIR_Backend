@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 import pytz
 from fhirclient import server
 
-FHIR_SERVER_URL = os.environ.get("FHIR_SERVER_URL", "http://10.69.12.83:8080/")
+FHIR_SERVER_URL = os.environ.get("FHIR_SERVER_URL", "http://10.69.12.83:8080/fhir")
 fhir_server = server.FHIRServer(None, FHIR_SERVER_URL)
 
 STEMI_ICD_DICT = {

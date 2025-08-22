@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status,Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 from pydantic import BaseModel
 from sqlmodel import select
 from datetime import timedelta
@@ -32,7 +33,7 @@ import logging
 
 
 
-app = FastAPI(root_path='/api/')  # root_path='/api/'
+app = FastAPI()  # 移除 root_path 用於本地測試
 app.include_router(STEMI.router)
 app.include_router(admin.router)
 # 其他路由器暫時註解，因為只有 STEMI 功能
@@ -186,10 +187,35 @@ async def changePassword(
 async def init_main_database():
     """初始化主要資料庫和資料表"""
     try:
-        # 創建所有 SQLModel 定義的資料表
+        # 檢查表格是否已存在
         async with base_engine.begin() as conn:
-            await conn.run_sync(SQLModel.metadata.create_all)
-        print("主要資料庫資料表創建成功")
+            # 檢查表格是否存在的簡單方法 - 使用 PostgreSQL 語法
+            try:
+                # 檢查 PostgreSQL 中的表格
+                result = await conn.execute(text("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name IN ('account', 'resources', 'hospital_info')
+                """))
+                existing_tables = [row[0] for row in result.fetchall()]
+                
+                required_tables = ['account', 'resources', 'hospital_info']
+                missing_tables = [table for table in required_tables if table not in existing_tables]
+                
+                if missing_tables:
+                    # 只有在有缺少的表格時才創建
+                    await conn.run_sync(SQLModel.metadata.create_all)
+                    print(f"主要資料庫資料表創建成功 (新建表格: {', '.join(missing_tables)})")
+                else:
+                    # print("主要資料庫資料表已存在，跳過創建")
+                    pass
+                    
+            except Exception as check_error:
+                # 如果檢查失敗，可能是表格不存在，直接創建
+                await conn.run_sync(SQLModel.metadata.create_all)
+                print("主要資料庫資料表創建成功")
+                
     except Exception as e:
         print(f"主要資料庫初始化失敗: {e}")
 

@@ -13,7 +13,6 @@ import fhirclient.models.coding as Coding
 from io import BytesIO
 import base64
 import fitz
-from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime, timedelta, timezone
 import pytz
 from app.fhir_processor import fhir_server
@@ -91,147 +90,40 @@ async def inference(
         )
 
         report, opt, img, raw_out = stemiInf(xmlFilelike)
-        
-        # 將 AI 推論結果轉換為字典格式 (原始邏輯保持不變)
         raw_out = {i[0][0]: i[0][1] for i in raw_out}
-        print(f"📊 推論結果: {raw_out}")
-        
-        # 處理 STEMI 值計算 (確保 STEMI 鍵存在)
-        if "STEMI" not in raw_out:
-            if "Not Acute STEMI" in raw_out:
-                # 從 "Not Acute STEMI" 的原始 sigmoid 值計算 STEMI 機率
-                not_stemi_sigmoid = raw_out["Not Acute STEMI"]
-                raw_out["STEMI"] = not_stemi_sigmoid  # 保持原始 sigmoid 值
-                print(f"🔄 從 'Not Acute STEMI' 設定 STEMI 值: {raw_out['STEMI']:.6f}")
-            elif "非STEMI" in raw_out:
-                # 從 "非STEMI" 計算 STEMI 機率
-                raw_out["STEMI"] = 1.0 - raw_out["非STEMI"]
-                print(f"🔄 從 '非STEMI' 計算 STEMI 機率: {raw_out['STEMI']:.4f}")
-            else:
-                # 如果都沒有，使用預設值
-                raw_out["STEMI"] = 0.25
-                print("⚠️  STEMI 相關鍵不存在，使用預設值")
-        
-        # 🔍 統一計算 STEMI 顯示值 (使用與 postprocess_text 相同的邏輯)
-        stemi_sigmoid = raw_out["STEMI"]
-        thres = 0.5
-        
-        if stemi_sigmoid >= thres:
-            # Acute STEMI 情況
-            norm_predicted = (stemi_sigmoid - thres) / (1 - thres) * 0.5 + 0.5
-            stemi_display_prob = norm_predicted * 100
-            stemi_label = "Acute STEMI"
-        else:
-            # Not Acute STEMI 情況
-            norm_predicted = (thres - stemi_sigmoid) / thres * 0.5 + 0.5
-            stemi_display_prob = norm_predicted * 100
-            stemi_label = "Not Acute STEMI"
-        
-        print(f"🔍 STEMI 最終計算: sigmoid={stemi_sigmoid:.6f}, 顯示={stemi_label}: {stemi_display_prob:.2f}%")
 
-        # 檢查是否有有效的圖像資料
-        if img and img.strip():
-            try:
-                # img 已經是 Base64 編碼的字符串，直接解碼為 bytes
-                imgByte = base64.b64decode(img)
-                has_image = True
-            except Exception as e:
-                print(f"⚠️  圖像解碼失敗: {e}")
-                has_image = False
-        else:
-            print("⚠️  沒有圖像資料，將跳過圖像插入")
-            has_image = False
-            
-        # 完全模仿原始 PDF 邏輯，只改成 PNG 輸出
-        # 原始邏輯：
-        # 1. 創建 PDF 頁面 (height=400)
-        # 2. 文字在 (10, 330)
-        # 3. 圖像在 rect(0, 20, page.rect.width, 292+20)
-        
-        # 設定畫布大小 - 模仿 PDF 頁面
-        # 假設 PDF 寬度約為 595 (A4)，高度 400
-        canvas_width = 595
-        canvas_height = 400
-        
-        # 創建白色背景
-        combined_img = Image.new('RGB', (canvas_width, canvas_height), 'white')
-        draw = ImageDraw.Draw(combined_img)
-        
-        # 載入字型
-        try:
-            font_normal = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", 10)
-        except:
-            try:
-                font_normal = ImageFont.truetype("C:/Windows/Fonts/simsun.ttc", 10)
-            except:
-                font_normal = ImageFont.load_default()
-        
-        # 1. 插入圖像 - 完全模仿原始邏輯
-        # 原始: rect = fitz.Rect(0, 20, page.rect.width, 292 + 20)
-        if has_image:
-            try:
-                # 直接使用原始圖像字節，不重新處理！
-                original_img = Image.open(BytesIO(imgByte))
-                
-                # 模仿原始矩形區域: (0, 20, page.rect.width, 292+20)
-                img_x = 0
-                img_y = 20
-                img_width = canvas_width
-                img_height = 292
-                
-                # 調整圖像尺寸以符合矩形區域
-                original_img = original_img.resize((img_width, img_height), Image.Resampling.LANCZOS)
-                
-                # 貼上圖像
-                combined_img.paste(original_img, (img_x, img_y))
-                print("✅ ECG 圖像已插入 PNG")
-            except Exception as e:
-                print(f"⚠️  ECG 圖像插入失敗: {e}")
-                draw.text((10, 50), f"ECG 圖像載入失敗: {str(e)}", fill='red', font=font_normal)
-        else:
-            draw.text((10, 50), "註: ECG 圖像暫時無法顯示", fill='gray', font=font_normal)
-        
-        # 2. 插入文字 - 只顯示核心 AI 結果數據
-        # 原始: p = fitz.Point(10, 330)
-        text_x = 10
-        text_y = 330
-        
-        # 🎯 簡化報告：只顯示核心 AI 結果數據
-        lines_to_show = []
-        
-        # 找出主要疾病 (非 STEMI 的項目)
-        disease = [i for i in raw_out.keys() if i != "STEMI"][0]
-        disease_prob = raw_out[disease] * 100
-        
-        # 直接使用原始鍵名，不做對照
-        lines_to_show.append(f"{disease}: {disease_prob:.2f}%")
-        lines_to_show.append(f"{stemi_label}: {stemi_display_prob:.2f}%")
-        
-        # 繪製簡潔的結果文字
-        for line in lines_to_show:
-            if text_y < canvas_height - 10:  # 防止超出邊界
-                draw.text((text_x, text_y), line, fill='black', font=font_normal)
-                text_y += 15  # 行距
-        
-        # 3. 保存為 PNG - 替代原始的 PDF 保存
-        png_buffer = BytesIO()
-        combined_img.save(png_buffer, format='PNG', optimize=True)
+        imgByte = base64.b64decode(img)
+        doc = fitz.open()
+        doc.insert_page(0, height=400)
+        page = doc.load_page(0)
+
+        p = fitz.Point(10, 330)
+        rc = page.insert_text(
+            p,  # bottom-left of 1st char
+            report.replace("<br>", "\n"),  # the text (honors '\n')
+        )
+
+        y = 20
+        rect = fitz.Rect(0, y, page.rect.width, 292 + y)
+        page.insert_image(rect, stream=imgByte)
+        pdf = BytesIO()
+        doc.save(pdf)
         att = ATT.Attachment()
-        att.contentType = "image/png"
-        png_buffer.seek(0)
-        att.data = base64.b64encode(png_buffer.read()).decode("utf-8")
+        att.contentType = "application/pdf"
+        pdf.seek(0)
+        att.data = base64.b64encode(pdf.read()).decode("utf-8")
 
         # print(os.listdir())
         obsjs = json.load(open("app/emptyOBS/stemi.obs.json"))
         obs = OBS.Observation(obsjs)
 
         obs.component[0].interpretation[0].coding[0].code = (
-            "A" if stemi_sigmoid >= 0.5 else "N"
+            "A" if raw_out["STEMI"] >= 0.5 else "N"
         )
         obs.component[0].interpretation[0].coding[0].display = (
-            "Abnormal" if stemi_sigmoid >= 0.5 else "Normal"
+            "Abnormal" if raw_out["STEMI"] >= 0.5 else "Normal"
         )
-        obs.component[0].valueQuantity.value = float(f"{stemi_display_prob:.2f}")
+        obs.component[0].valueQuantity.value = float(f"{raw_out['STEMI'] * 100:.2f}")
 
         disease = [i for i in raw_out.keys() if i != "STEMI"][0]
         if disease != "NSR":
@@ -261,18 +153,7 @@ async def inference(
                 f"{raw_out[disease] * 100:.2f}"
             )
 
-        # 🎯 使用簡化的文字，而不是原始的冗長 report
-        # 建立簡潔的結果文字
-        disease = [i for i in raw_out.keys() if i != "STEMI"][0]
-        disease_prob = raw_out[disease] * 100
-        
-        # 建立簡潔的報告文字 - 直接使用原始鍵名
-        simple_report_lines = []
-        simple_report_lines.append(f"{disease}: {disease_prob:.2f}%")
-        simple_report_lines.append(f"{stemi_label}: {stemi_display_prob:.2f}%")
-        
-        simple_report = "\n".join(simple_report_lines)
-        obs.note[0].text = simple_report
+        obs.note[0].text = report.replace("<br>", "\n")
 
         dr.contained = [obs]
         result = fref.FHIRReference()

@@ -18,7 +18,8 @@ def setup_environment():
     # 設置預設的環境變數（如果沒有設置的話）
     env_vars = {
         "HAPIFHIR_postgres": "10.69.12.83:8008",  # 您的 FHIR 資料庫
-        "FHIR_SERVER_URL": "http://10.69.12.83:8080/",  # 您的 FHIR 伺服器
+        "FHIR_SERVER_URL": "http://10.69.12.83:8080/fhir",  # 您的 FHIR 伺服器（修正）
+        "GRPC_SERVER_ADDRESS": "10.69.12.83:8006",  # 您的 gRPC 推論伺服器
         "MONGO_MAINURI": "10.65.51.240:27017",  # MongoDB 主要
         "MONGO_BACKUPURI": "10.65.51.237:27017",  # MongoDB 備援
         "mongodb131name": "FHIR",
@@ -40,10 +41,10 @@ def main():
     setup_environment()
     
     # 啟動 FastAPI 應用
-    print("\n啟動 Web 服務器...")
-    print("API 文檔: http://localhost:8000/docs")
-    print("登入測試: http://localhost:8000/login")
-    print("按 Ctrl+C 停止服務器\n")
+    # print("\n啟動 Web 服務器...")
+    # print("API 文檔: http://localhost:8000/docs")
+    # print("登入測試: http://localhost:8000/login")
+    # print("按 Ctrl+C 停止服務器\n")
     
     uvicorn.run(
         "app.main:app",

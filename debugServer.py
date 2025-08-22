@@ -16,7 +16,7 @@ def setup_debug_environment():
     debug_env_vars = {
         "HAPIFHIR_postgres": "10.69.12.83:8008",
         "FHIR_SERVER_URL": "http://10.69.12.83:8080/",
-        "GRPC_SERVER_ADDRESS": "10.21.98.80:8001",
+        "GRPC_SERVER_ADDRESS": "10.69.12.83:8006",
         "MONGO_MAINURI": "10.65.51.240:27017",
         "MONGO_BACKUPURI": "10.65.51.237:27017",
         "mongodb131name": "FHIR",

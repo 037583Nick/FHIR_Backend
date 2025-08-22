@@ -9,7 +9,7 @@ services:
       - seccomp:unconfined
     environment:
       - FHIR_SERVER_URL=http://10.69.12.83:8080/
-      - GRPC_SERVER_ADDRESS=10.21.98.80:8001
+      - GRPC_SERVER_ADDRESS=10.69.12.83:8006
       - PYTHONUNBUFFERED=1
       - TZ=Asia/Taipei
     ports:

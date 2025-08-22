@@ -3,14 +3,9 @@ import xmltodict
 import numpy as np
 import base64
 import collections
-import os
-from io import StringIO
-
-# 直接導入舊版 ECG 處理器，按照 oldstemi.py 的方式
 from ..AI import ECG_AllPreprocessor
-
-# 從環境變數讀取 gRPC 伺服器地址，如果沒有則使用新版地址
-GRPC_SERVER_ADDRESS = os.getenv("GRPC_SERVER_ADDRESS", "10.69.12.83:8006")
+from io import StringIO
+GRPC_SERVER_ADDRESS = "10.21.98.80:8001"
 
 STEMI_ICD_DICT = {
     "AFIB": [
@@ -89,22 +84,55 @@ def ekg_opt_report(raw_data):
 
 def inference(filelike):
     receive_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # 直接使用 AI 推論，移除所有模擬數據邏輯 (按照 oldstemi.py 的方式)
     filelike.seek(0)
-    content = filelike.read()
+    x = filelike.read()
     
-    # 處理字符串或字節數據
-    if isinstance(content, bytes):
-        stemi_project = StringIO(content.decode('utf-8'))
-    else:
-        stemi_project = StringIO(content)
-        
-    # 直接呼叫 AI，不使用模擬數據
+    xd = xmltodict.parse(x)
+    # See if we can load that secondary IDf
+    # accno = xd['RestingECG']['TestDemographics']['SecondaryID']
+
+    # if accno == None or accno == '':
+    #     print('Error loading secondary id')
+    #     raise ValueError('Error loading secondary id')
+
+    # accno = accno.upper()
+    # # If we can load secondary ID, we can load everything else
+    # patid = xd['RestingECG']['PatientDemographics']['PatientID']
+    # # Just the first letter
+    # gender = xd['RestingECG']['PatientDemographics']['Gender'][0]
+    # patage = xd['RestingECG']['PatientDemographics']['PatientAge'] + \
+    #             ' ' + xd['RestingECG']['PatientDemographics']['AgeUnits']
+    # birthdate = xd['RestingECG']['PatientDemographics']['DateofBirth']
+    # studydate = ''.join([xd['RestingECG']['TestDemographics']
+    #                         ['AcquisitionDate'].split('-')[i] for i in [2, 0, 1]])
+    # studytime = ''.join(
+    #     xd['RestingECG']['TestDemographics']['AcquisitionTime'].split(':'))
+    # model = 'ecg_multicat16'
+    # # Get location as study description
+    # studydesc = xd['RestingECG']['TestDemographics']['LocationName']
+
+    # wavedata = dict()
+    # for w in xd['RestingECG']['Waveform'][1]['LeadData']:
+    #     wavedata[w['LeadID']] = np.frombuffer(base64.b64decode(
+    #         w['WaveFormData']), dtype=np.int16) * (float(w['LeadAmplitudeUnitsPerBit']) / 1000)
+    # wavedata["AVR"] = -1 * ((wavedata["I"] + wavedata["II"]) / 2)
+    # wavedata["AVL"] = wavedata["I"] - wavedata["II"] / 2
+    # wavedata["AVF"] = wavedata["II"] - wavedata["I"] / 2
+    # wavedata["III"] = wavedata["II"] - wavedata["I"]
+
+    # print(wavedata.keys())
+    # print(type(wavedata))
+    # print(wavedata['I'].shape)
+    # print('ECGname:',ecg_apiname)
+
+    
+    filelike.seek(0)
+    stemi_project = StringIO(filelike.read().decode('utf-8'))
     imgproc = ECG_AllPreprocessor(stemi_project, server=GRPC_SERVER_ADDRESS)
     encoded_image, report_text, raw_out, forER_Alert = imgproc.get_results()
 
     opt_report_text = ekg_opt_report(raw_data=raw_out)
+
 
     return report_text, opt_report_text, encoded_image, raw_out
 
