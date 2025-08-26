@@ -33,7 +33,7 @@ router = APIRouter(
 )
 
 
-@router.post("/")
+@router.post("")
 async def inference(
     response: Response,
     r: Request,
@@ -94,7 +94,7 @@ async def inference(
         
         # 將 AI 推論結果轉換為字典格式 (原始邏輯保持不變)
         raw_out = {i[0][0]: i[0][1] for i in raw_out}
-        print(f"📊 推論結果: {raw_out}")
+        # print(f"📊 推論結果: {raw_out}")
         
         # 處理 STEMI 值計算 (確保 STEMI 鍵存在)
         if "STEMI" not in raw_out:
@@ -127,7 +127,7 @@ async def inference(
             stemi_display_prob = norm_predicted * 100
             stemi_label = "Not Acute STEMI"
         
-        print(f"🔍 STEMI 最終計算: sigmoid={stemi_sigmoid:.6f}, 顯示={stemi_label}: {stemi_display_prob:.2f}%")
+        # print(f"🔍 STEMI 最終計算: sigmoid={stemi_sigmoid:.6f}, 顯示={stemi_label}: {stemi_display_prob:.2f}%")
 
         # 檢查是否有有效的圖像資料
         if img and img.strip():
@@ -148,74 +148,96 @@ async def inference(
         # 2. 文字在 (10, 330)
         # 3. 圖像在 rect(0, 20, page.rect.width, 292+20)
         
-        # 設定畫布大小 - 模仿 PDF 頁面
-        # 假設 PDF 寬度約為 595 (A4)，高度 400
-        canvas_width = 595
-        canvas_height = 400
+        # 設定畫布大小 - 基於實際 ECG 圖像尺寸
+        # ECG 原始尺寸：1398×694，適度優化尺寸以平衡品質與檔案大小
+        ecg_width = 1200   # 從 1398 略為縮小，仍保持高品質
+        ecg_height = 600   # 對應縮放，保持比例
         
-        # 創建白色背景
+        # 畫布尺寸：為 ECG 圖像預留空間 + 文字區域
+        canvas_width = ecg_width
+        canvas_height = ecg_height + 150  # ECG 圖像 + 文字區域高度
+        
+        # 創建基於實際 ECG 尺寸的白色背景
         combined_img = Image.new('RGB', (canvas_width, canvas_height), 'white')
         draw = ImageDraw.Draw(combined_img)
         
-        # 載入字型
+        # 載入字型 - 使用專案內的字型檔案
         try:
-            font_normal = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", 10)
+            # 調整字型大小以匹配新的圖像尺寸
+            font_size_normal = 24  # 適合 1200px 寬度的字型
+            font_size_bold = 28
+            
+            font_normal = ImageFont.truetype("fonts/arial.ttf", font_size_normal)
         except:
             try:
-                font_normal = ImageFont.truetype("C:/Windows/Fonts/simsun.ttc", 10)
+                font_normal = ImageFont.truetype("fonts/simsun.ttc", font_size_normal)
             except:
+                print("⚠️  無法載入專案字型，使用預設字型")
                 font_normal = ImageFont.load_default()
-        
-        # 1. 插入圖像 - 完全模仿原始邏輯
-        # 原始: rect = fitz.Rect(0, 20, page.rect.width, 292 + 20)
+
+        # 1. 插入 ECG 圖像 - 保持原始比例和品質
         if has_image:
             try:
-                # 直接使用原始圖像字節，不重新處理！
+                # 載入原始 ECG 圖像
                 original_img = Image.open(BytesIO(imgByte))
+                orig_w, orig_h = original_img.size
                 
-                # 模仿原始矩形區域: (0, 20, page.rect.width, 292+20)
+                # ECG 圖像區域：從頂部開始，預留少量邊距
                 img_x = 0
                 img_y = 20
-                img_width = canvas_width
-                img_height = 292
                 
-                # 調整圖像尺寸以符合矩形區域
-                original_img = original_img.resize((img_width, img_height), Image.Resampling.LANCZOS)
+                # 保持 ECG 圖像原始尺寸，不強制縮放
+                if orig_w == ecg_width and orig_h == ecg_height:
+                    # 完美匹配，直接使用
+                    ecg_img = original_img
+                else:
+                    # 等比例縮放以適應畫布寬度
+                    aspect_ratio = orig_h / orig_w
+                    new_width = ecg_width
+                    new_height = int(new_width * aspect_ratio)
+                    ecg_img = original_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
                 
-                # 貼上圖像
-                combined_img.paste(original_img, (img_x, img_y))
-                print("✅ ECG 圖像已插入 PNG")
+                # 貼上 ECG 圖像
+                combined_img.paste(ecg_img, (img_x, img_y))
+                print(f"✅ ECG 圖像已插入: {ecg_img.size[0]}×{ecg_img.size[1]}")
             except Exception as e:
                 print(f"⚠️  ECG 圖像插入失敗: {e}")
-                draw.text((10, 50), f"ECG 圖像載入失敗: {str(e)}", fill='red', font=font_normal)
+                draw.text((20, 100), f"ECG 圖像載入失敗: {str(e)}", fill='red', font=font_normal)
         else:
-            draw.text((10, 50), "註: ECG 圖像暫時無法顯示", fill='gray', font=font_normal)
+            draw.text((20, 100), "註: ECG 圖像暫時無法顯示", fill='gray', font=font_normal)
         
-        # 2. 插入文字 - 只顯示核心 AI 結果數據
-        # 原始: p = fitz.Point(10, 330)
-        text_x = 10
-        text_y = 330
+        # 2. 插入文字 - 在 ECG 圖像下方
+        # 文字區域位於 ECG 圖像下方
+        text_x = 20
+        text_y = ecg_height + 40  # ECG 圖像高度 + 間距
         
-        # 🎯 簡化報告：只顯示核心 AI 結果數據
-        lines_to_show = []
+        # 🔧 使用與舊版相同的完整 report，高品質字型清晰度
+        full_report_text = report.replace("<br>", "\n")
         
-        # 找出主要疾病 (非 STEMI 的項目)
-        disease = [i for i in raw_out.keys() if i != "STEMI"][0]
-        disease_prob = raw_out[disease] * 100
+        # 將完整報告按行分割
+        report_lines = full_report_text.split('\n')
         
-        # 直接使用原始鍵名，不做對照
-        lines_to_show.append(f"{disease}: {disease_prob:.2f}%")
-        lines_to_show.append(f"{stemi_label}: {stemi_display_prob:.2f}%")
+        # 繪製完整報告文字
+        y_offset = 0
+        line_spacing = 30  # 適合較大字型的行距
+        for line in report_lines:
+            if text_y + y_offset < canvas_height - 20:  # 防止超出邊界
+                # 高品質字型渲染，保持原始格式
+                draw.text((text_x, text_y + y_offset), line, fill='black', font=font_normal)
+                y_offset += line_spacing
         
-        # 繪製簡潔的結果文字
-        for line in lines_to_show:
-            if text_y < canvas_height - 10:  # 防止超出邊界
-                draw.text((text_x, text_y), line, fill='black', font=font_normal)
-                text_y += 15  # 行距
-        
-        # 3. 保存為 PNG - 替代原始的 PDF 保存
+        # 3. 智能保存為優化的 PNG
         png_buffer = BytesIO()
-        combined_img.save(png_buffer, format='PNG', optimize=True)
+        # 平衡品質與檔案大小的最佳設定
+        combined_img.save(png_buffer, format='PNG', 
+                         optimize=True,         # 啟用 PNG 優化（不影響視覺品質）
+                         compress_level=6,      # 中等壓縮（0-9，6是平衡點）
+                         pnginfo=None)          # 不添加額外元數據
+        
+        # 檢查檔案大小並記錄
+        png_size = len(png_buffer.getvalue())
+        print(f"📊 PNG 檔案大小: {png_size / 1024 / 1024:.2f} MB")
+        
         att = ATT.Attachment()
         att.contentType = "image/png"
         png_buffer.seek(0)
@@ -266,13 +288,8 @@ async def inference(
         disease = [i for i in raw_out.keys() if i != "STEMI"][0]
         disease_prob = raw_out[disease] * 100
         
-        # 建立簡潔的報告文字 - 直接使用原始鍵名
-        simple_report_lines = []
-        simple_report_lines.append(f"{disease}: {disease_prob:.2f}%")
-        simple_report_lines.append(f"{stemi_label}: {stemi_display_prob:.2f}%")
-        
-        simple_report = "\n".join(simple_report_lines)
-        obs.note[0].text = simple_report
+        # 🔧 使用完整的 report，與舊版一致
+        obs.note[0].text = report.replace("<br>", "\n")
 
         dr.contained = [obs]
         result = fref.FHIRReference()
@@ -334,12 +351,12 @@ async def inference(
         ] = f"Bearer {create_access_token({'username':user})}"
         return resp
 
-@router.get("/ActivityDefinition/")
+@router.get("/ActivityDefinition")
 def get_Activity_Definition():
     return AD.ActivityDefinition.read(2165, fhir_server).as_json()
 
 
-@router.get("/{id}/")
+@router.get("/{id}")
 def get_Report(response: Response, id: str = Path(...), user: str = Depends(get_user)):
     response.headers["Authorization"] = f"Bearer {create_access_token({'username':user})}"
     dr = DR.DiagnosticReport.read(id, fhir_server)

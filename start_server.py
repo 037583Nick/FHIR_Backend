@@ -8,10 +8,14 @@ import uvicorn
 import os
 import sys
 from pathlib import Path
+import logging
 
 # 添加專案根目錄到 Python 路徑
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
+
+# 設置 Uvicorn access 日誌級別為 WARNING，隱藏 INFO 級別的請求日誌
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
 def setup_environment():
     """設置環境變數"""
@@ -29,13 +33,13 @@ def setup_environment():
     for key, default_value in env_vars.items():
         if key not in os.environ:
             os.environ[key] = default_value
-            print(f"設置環境變數: {key} = {default_value}")
+            # print(f"設置環境變數: {key} = {default_value}")
 
 def main():
     """主函數"""
-    print("=" * 50)
-    print("FHIR Backend 啟動中...")
-    print("=" * 50)
+    # print("=" * 50)
+    # print("FHIR Backend 啟動中...")
+    # print("=" * 50)
     
     # 設置環境變數
     setup_environment()
