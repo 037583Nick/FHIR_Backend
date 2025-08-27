@@ -3,7 +3,7 @@ fastapi==0.104.0
 # aiofiles
 numpy==1.26.1
 python-multipart==0.0.6
-psycopg2==2.9.9
+psycopg2-binary==2.9.9
 # pandas
 python-jose==3.3.0
 # minio
@@ -15,8 +15,7 @@ pymupdf
 xmltodict
 pillow==10.1.0
 # googletrans
-protobuf==3.17.1
-grpcio
+protobuf==3.20.3
 matplotlib
 pytz
 apscheduler==3.10.4
@@ -28,6 +27,9 @@ bcrypt==4.0.1
 pandas 
 joblib
 scikit-learn==1.2.2
+httpx==0.24.1
+
+tritonclient[grpc]==2.20.0
 
 ### iAST
 nmrglue

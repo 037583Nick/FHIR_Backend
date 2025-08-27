@@ -14,48 +14,63 @@ import logging
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-# 設置 Uvicorn access 日誌級別為 WARNING，隱藏 INFO 級別的請求日誌
-logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+# ====================================================================
+# 新增的日誌配置部分
+# ====================================================================
+
+# 自定義過濾器來忽略特定路徑的日誌
+class HealthCheckFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        # 🚀 完全阻止所有 /docs 相關請求的日誌，不管狀態碼
+        if "/docs" in message or "/health" in message or "/openapi.json" in message or "/redoc" in message:
+            return False  # 完全過濾掉所有健康檢查相關的請求
+        return True  # 其他請求正常記錄
+
+# 獲取 Uvicorn 默認的日誌配置
+LOGGING_CONFIG = uvicorn.config.LOGGING_CONFIG
+
+# 為 uvicorn.access logger 添加自定義過濾器
+LOGGING_CONFIG["filters"] = {
+    "health_check_filter": {
+        "()": __name__ + ".HealthCheckFilter" # 指向當前模塊中的 HealthCheckFilter 類
+    }
+}
+LOGGING_CONFIG["loggers"]["uvicorn.access"]["filters"] = ["health_check_filter"]
+
+# 確保 uvicorn.access 的級別為 INFO，這樣它才能接收到 INFO 級別的請求日誌
+# 但因為有過濾器，成功的健康檢查會被過濾
+LOGGING_CONFIG["loggers"]["uvicorn.access"]["level"] = "INFO"
+
+# ====================================================================
+# 結束日誌配置部分
+# ====================================================================
 
 def setup_environment():
     """設置環境變數"""
-    # 設置預設的環境變數（如果沒有設置的話）
     env_vars = {
-        "HAPIFHIR_postgres": "10.69.12.83:8008",  # 您的 FHIR 資料庫
-        "FHIR_SERVER_URL": "http://10.69.12.83:8080/fhir",  # 您的 FHIR 伺服器（修正）
-        "GRPC_SERVER_ADDRESS": "10.69.12.83:8006",  # 您的 gRPC 推論伺服器
-        "MONGO_MAINURI": "10.65.51.240:27017",  # MongoDB 主要
-        "MONGO_BACKUPURI": "10.65.51.237:27017",  # MongoDB 備援
+        "HAPIFHIR_postgres": "10.69.12.83:8008",
+        "FHIR_SERVER_URL": "http://10.69.12.83:8080/fhir",
+        "GRPC_SERVER_ADDRESS": "10.69.12.83:8006",
+        "MONGO_MAINURI": "10.65.51.240:27017",
+        "MONGO_BACKUPURI": "10.65.51.237:27017",
         "mongodb131name": "FHIR",
         "mongodb131coletion": "resources"
     }
-    
     for key, default_value in env_vars.items():
         if key not in os.environ:
             os.environ[key] = default_value
-            # print(f"設置環境變數: {key} = {default_value}")
 
 def main():
     """主函數"""
-    # print("=" * 50)
-    # print("FHIR Backend 啟動中...")
-    # print("=" * 50)
-    
-    # 設置環境變數
     setup_environment()
-    
-    # 啟動 FastAPI 應用
-    # print("\n啟動 Web 服務器...")
-    # print("API 文檔: http://localhost:8000/docs")
-    # print("登入測試: http://localhost:8000/login")
-    # print("按 Ctrl+C 停止服務器\n")
     
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,  # 開發模式，檔案變更時自動重載
-        log_level="info"
+        reload=True,  # 🚀 開啟 reload，檔案變更時自動重載
+        log_config=LOGGING_CONFIG # 使用我們上面定義的日誌配置字典
     )
 
 if __name__ == "__main__":

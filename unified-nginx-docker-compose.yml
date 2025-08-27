@@ -1,0 +1,27 @@
+version: '3.9'
+
+services:
+  nginx:
+    image: nginx:stable-alpine
+    container_name: aic-nginx-gateway
+    restart: unless-stopped
+    network_mode: host  # 使用宿主機網路，可以訪問所有本地服務
+    ports:
+      - "80:80"     # HTTP
+      - "443:443"   # HTTPS (將來可用)
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  nginx_logs:

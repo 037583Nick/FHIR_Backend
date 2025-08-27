@@ -1,34 +1,38 @@
+# Docker Compose - BUILD 版本
+# 用於在 240 機器上建置並推送映像
 version: '3.9'
 services:
   app:
     image: 10.18.27.131:17180/fhir/tmgrgh-fhir-backend:v1.0.0
-    container_name: fhir_backend # <-- 確保有這一行
-    restart: always
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: fhir_backend # 與運行版本一致
+    restart: unless-stopped
     security_opt:
       - seccomp:unconfined
     environment:
-      FHIR_SERVER_URL: http://10.69.12.83:8080/fhir
-      Triton_client: http://10.20.8.137:12345
-      HAPIFHIR_postgres: 10.69.12.83:8008
-      MONGO_MAINURI: 10.65.51.240:27017
-      MONGO_BACKUPURI: 10.18.27.131:27017
-      mongodb131name: FHIR
-      mongodb131coletion: resources
-      GRPC_SERVER_ADDRESS: 10.69.12.83:8006
-      PYTHONUNBUFFERED: 1
-      TZ: Asia/Taipei
+      - FHIR_SERVER_URL=http://10.69.12.83:8080/fhir
+      - Triton_client=http://10.20.8.137:12345
+      - HAPIFHIR_postgres=10.69.12.83:8008
+      - MONGO_MAINURI=10.65.51.240:27017
+      - MONGO_BACKUPURI=10.18.27.131:27017
+      - mongodb131name=FHIR
+      - mongodb131coletion=resources
+      - GRPC_SERVER_ADDRESS=10.69.12.83:8006
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Taipei
     ports:
-      - 8015:8000
-    # 🚀 生產環境不掛載程式碼，字型已打包在映像中
+      - 8015:8000  # 與運行版本一致
     volumes:
-      - ./logs:/app/logs  # 只掛載必要的日誌目錄
+      - ./logs:/app/logs  # 只掛載日誌目錄
     command: python start_server.py
     logging:
       driver: "json-file"
       options:
         max-size: "20m"
         max-file: "7"
-    networks: # <-- 確保有這一行
+    networks: # 添加網路配置
       - gateway_network
 
   logger:
@@ -45,7 +49,7 @@ services:
       # FHIR 專案特定的忽略模式
       - IGNORED_PATTERNS=health,docs,openapi.json,favicon.ico,metrics
     ports:
-      - "8016:8000"  # 避免與其他服務衝突
+      - "8016:8000"  # 與運行版本一致
     logging:
       driver: "json-file"
       options:
@@ -53,10 +57,10 @@ services:
         max-file: "2"
     volumes:
       - ./logs:/var/log/audit-logger
-    networks: # <-- 確保有這一行
+    networks: # 添加網路配置
       - gateway_network
 
-  # --- 宣告外部網路 ---
+# --- 宣告外部網路 ---
 networks:
   gateway_network:
     external: true

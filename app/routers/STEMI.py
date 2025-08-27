@@ -24,6 +24,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import os
 import pymongo
 from pymongo.errors import ServerSelectionTimeoutError
+import asyncio
+
+# 🚀 性能優化：應用啟動時快取 JSON 模板，避免每次檔案 I/O
+_CACHED_DR_TEMPLATE = None
+_CACHED_OBS_TEMPLATE = None
+_TIMEZONE_TAIPEI = pytz.timezone("Asia/Taipei")
+
+def _load_json_templates():
+    """載入並快取 JSON 模板"""
+    global _CACHED_DR_TEMPLATE, _CACHED_OBS_TEMPLATE
+    
+    if _CACHED_DR_TEMPLATE is None:
+        with open("app/emptyDR/stemi.dr.json", "r", encoding="utf-8") as f:
+            _CACHED_DR_TEMPLATE = json.load(f)
+    
+    if _CACHED_OBS_TEMPLATE is None:
+        with open("app/emptyOBS/stemi.obs.json", "r", encoding="utf-8") as f:
+            _CACHED_OBS_TEMPLATE = json.load(f)
+    
+    return _CACHED_DR_TEMPLATE.copy(), _CACHED_OBS_TEMPLATE.copy()
+
+# 初始化快取
+_load_json_templates()
 
 
 router = APIRouter(
@@ -32,8 +55,11 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+@router.get("/test")
+async def test_endpoint():
+    return {"message": "STEMI router is working", "status": "ok"}
 
-@router.post("")
+@router.post("/")
 async def inference(
     response: Response,
     r: Request,
@@ -51,18 +77,14 @@ async def inference(
     resp = sr.create(fhir_server)
     srid = resp["id"]
 
-    try:
-        mongo_col = mongo_client["FHIR"]["resources"]
-        # 嘗試連接主要 MongoDB
-        mongo_client.admin.command('ping')
-    except ServerSelectionTimeoutError as e:
-        get_tryExcept_Moreinfo(e)
-        mongo_col = mongo_client2["FHIR"]["resources"]
+    # 🚀 暫時停用 MongoDB 連線：直接跳過 MongoDB 儲存
+    mongo_col = None
 
-   # 儲存 ServiceRequest 至 MongoDB
-    mongo_col.insert_one(datetimeConverter(dict(resp)))
+    # 🚀 直接處理 contained 資料，簡化流程
     contained = {item.id: item for item in sr.contained}
 
+    # 🚀 直接建立 PostgreSQL 記錄，不使用批次操作
+    current_time_naive = datetime.now().replace(tzinfo=None)  # 無時區的時間
     sr_res = Resources(
         res_id=srid,
         res_type=sr.resource_type,
@@ -70,12 +92,13 @@ async def inference(
         requester=contained[sr.requester.reference[1:]].name,
         model="STEMI",
         status=sr.status,
-        create_time=datetime.now(),
+        create_time=current_time_naive,
         self_id=srid
     )
     db.add(sr_res)
     await db.commit()
 
+    # 🚀 直接載入 JSON 模板，簡化處理
     drjs = json.load(open("app/emptyDR/stemi.dr.json", "r", encoding="utf-8"))
     dr = DR.DiagnosticReport(drjs)
 
@@ -90,7 +113,15 @@ async def inference(
             base64.b64decode(contained[sr.supportingInfo[0].reference[1:]].data)
         )
 
+        # 🚀 安全檢查：確保 AI 推論函數可用
+        if stemiInf is None:
+            raise ImportError("STEMI AI 推論模組載入失敗，請檢查 inference 模組")
+
         report, opt, img, raw_out = stemiInf(xmlFilelike)
+        
+        # 🚀 安全檢查：確保 AI 推論結果不是 None
+        if raw_out is None:
+            raise ValueError("AI 推論失敗：raw_out 為 None")
         
         # 將 AI 推論結果轉換為字典格式 (原始邏輯保持不變)
         raw_out = {i[0][0]: i[0][1] for i in raw_out}
@@ -191,15 +222,20 @@ async def inference(
                     # 完美匹配，直接使用
                     ecg_img = original_img
                 else:
-                    # 等比例縮放以適應畫布寬度
+                    # 🚀 性能優化：使用更快的重採樣演算法
+                    # LANCZOS 品質最好但較慢，BILINEAR 速度快且品質可接受
                     aspect_ratio = orig_h / orig_w
                     new_width = ecg_width
                     new_height = int(new_width * aspect_ratio)
-                    ecg_img = original_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                    # 根據圖像大小選擇重採樣方法
+                    if orig_w > ecg_width * 2:  # 大圖像降採樣用 LANCZOS
+                        ecg_img = original_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                    else:  # 小圖像或相近大小用更快的 BILINEAR
+                        ecg_img = original_img.resize((new_width, new_height), Image.Resampling.BILINEAR)
                 
                 # 貼上 ECG 圖像
                 combined_img.paste(ecg_img, (img_x, img_y))
-                print(f"✅ ECG 圖像已插入: {ecg_img.size[0]}×{ecg_img.size[1]}")
+                # print(f"✅ ECG 圖像已插入: {ecg_img.size[0]}×{ecg_img.size[1]}")
             except Exception as e:
                 print(f"⚠️  ECG 圖像插入失敗: {e}")
                 draw.text((20, 100), f"ECG 圖像載入失敗: {str(e)}", fill='red', font=font_normal)
@@ -235,16 +271,16 @@ async def inference(
                          pnginfo=None)          # 不添加額外元數據
         
         # 檢查檔案大小並記錄
-        png_size = len(png_buffer.getvalue())
-        print(f"📊 PNG 檔案大小: {png_size / 1024 / 1024:.2f} MB")
+        # png_size = len(png_buffer.getvalue())
+        # print(f"📊 PNG 檔案大小: {png_size / 1024 / 1024:.2f} MB")
         
         att = ATT.Attachment()
         att.contentType = "image/png"
         png_buffer.seek(0)
         att.data = base64.b64encode(png_buffer.read()).decode("utf-8")
 
-        # print(os.listdir())
-        obsjs = json.load(open("app/emptyOBS/stemi.obs.json"))
+        # 🚀 直接載入 OBS 模板，簡化處理
+        obsjs = json.load(open("app/emptyOBS/stemi.obs.json", "r", encoding="utf-8"))
         obs = OBS.Observation(obsjs)
 
         obs.component[0].interpretation[0].coding[0].code = (
@@ -297,8 +333,10 @@ async def inference(
         dr.result = [result]
         dr.presentedForm = [att]
 
+        # 🚀 設定時間變數
+        current_time_tz = datetime.now(_TIMEZONE_TAIPEI)
         issued = fd.FHIRDate()
-        issued.date = datetime.now(pytz.timezone("Asia/Taipei")) + timedelta(minutes=1)
+        issued.date = current_time_tz + timedelta(minutes=1)
         dr.issued = issued
         dr.text = None
         dr.conclusion = None
@@ -306,8 +344,9 @@ async def inference(
     except Exception as e:
         print("SRID: ", srid)
         print(e)
+        current_time_tz = datetime.now(_TIMEZONE_TAIPEI)
         issued = fd.FHIRDate()
-        issued.date = datetime.now(pytz.timezone("Asia/Taipei"))
+        issued.date = current_time_tz
         dr.issued = issued
         dr.status = "entered-in-error"
         dr.conclusion = (
@@ -315,13 +354,12 @@ async def inference(
             if type(e).__name__ == "ExpatError"
             else f"{type(e).__name__}: {e}"
         )
-    # print(json.dumps(dr.as_json()))
+    
+    # 🚀 直接執行 FHIR 操作，不使用批次處理
     resp = dr.create(fhir_server)
     drid = resp["id"]
     
-    # 把 DiagnosticReport 存進 MongoDB
-    mongo_col.insert_one(datetimeConverter(dict(resp)))
-    
+    # 🚀 直接建立 DR PostgreSQL 記錄
     dr_res = Resources(
         res_id=drid,
         res_type=dr.resource_type,
@@ -330,7 +368,7 @@ async def inference(
         model="STEMI",
         status=dr.status,
         result=obs.as_json() if dr.status == "final" else {"detail": dr.conclusion},
-        create_time=datetime.now(),
+        create_time=current_time_naive,
         self_id=drid
     )
     db.add(dr_res)

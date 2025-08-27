@@ -5,7 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from pydantic import BaseModel
 from sqlmodel import select
-from datetime import timedelta
+from datetime import timedelta, datetime
+import time
+import httpx
+import json
 
 from .models import get_session, Account,base_engine
 # from .CTCAE_models import ctcae_engine,database_name,ctcae_metadata  # 暫時註解
@@ -32,8 +35,7 @@ import os
 import logging
 
 
-
-app = FastAPI()  # 移除 root_path 用於本地測試
+app = FastAPI(root_path='/api/')  # root_path='/api/'
 app.include_router(STEMI.router)
 app.include_router(admin.router)
 # 其他路由器暫時註解，因為只有 STEMI 功能
@@ -63,12 +65,74 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Custom logging middleware
+# 🚀 增強的中間件：記錄日誌並發送到 audit logger
 @app.middleware("http")
 async def add_logwging(request: Request, call_next):
+    start_time = time.time()
     response = await call_next(request)
-    logging.info(f"{request.client.host}:{request.client.port} - {request.method} {request.url} {response.status_code}")
+    process_time = time.time() - start_time
+    
+    # 🚀 定義需要過濾的路徑（健康檢查相關）
+    ignored_paths = ["/docs", "/openapi.json", "/redoc", "/favicon.ico", "/health"]
+    
+    # 檢查是否為需要過濾的路徑
+    should_log = True
+    request_path = str(request.url.path)
+    
+    for ignored_path in ignored_paths:
+        if ignored_path in request_path:
+            should_log = False
+            break
+    
+    # 🎯 只記錄真正的 API 請求（POST、GET 等業務操作）
+    if should_log:
+        # 本地日誌記錄
+        logging.info(f"{request.client.host}:{request.client.port} - {request.method} {request.url} {response.status_code}")
+        
+        # 🚀 發送到 audit logger
+        await send_audit_log(request, response, process_time)
+    
     return response
+
+async def send_audit_log(request: Request, response, process_time: float):
+    """發送審計日誌到 audit logger 服務"""
+    try:
+        # 準備日誌資料 - 轉換為 JSON 字串，符合 logger 預期格式
+        log_data = {
+            "timestamp": datetime.now().isoformat(),
+            "method": request.method,
+            "path": str(request.url.path),
+            "query_params": str(request.url.query) if request.url.query else "",
+            "status_code": response.status_code,
+            "process_time_ms": round(process_time * 1000, 2),
+            "client_ip": request.client.host,
+            "user_agent": request.headers.get("User-Agent", "Unknown"),
+            "content_type": request.headers.get("Content-Type", ""),
+            "api": f"{request.method} {request.url.path}",  # 🔧 修正：改為字串而不是嵌套物件
+            "project": "FHIR-Backend"
+        }
+        
+        # 🔧 轉換為 JSON 字串發送（符合 logger 的 await request.body() 預期）
+        log_json_string = json.dumps(log_data, ensure_ascii=False)
+        
+        # 異步發送到 audit logger
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                "http://FHIR-backend-logger:8000/log",
+                content=log_json_string,  # 發送純文字 JSON
+                timeout=0.5,  # 🚀 500ms 超時保護，避免影響主服務性能
+                headers={"Content-Type": "application/json"}
+            )
+            
+    except Exception as e:
+        # 發送失敗不影響主要功能，只記錄錯誤
+        logging.warning(f"Failed to send audit log: {str(e)}")
+        pass
+
+@app.get("/")
+async def root():
+    return {"message": "FHIR Backend API is running", "status": "healthy"}
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

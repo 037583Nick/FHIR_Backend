@@ -18,7 +18,7 @@ HAPIFHIR_IP = os.environ.get("HAPIFHIR_postgres", "10.69.12.83:8008")
 sqlite_url = f"postgresql+asyncpg://aicenter:1234qwer@{HAPIFHIR_IP}/hapifhir"
 
 # MongoDB 連線設定
-MONGO_MAINURI = os.environ.get("MONGO_MAINURI", "10.65.51.240:27017")
+MONGO_MAINURI = os.environ.get("MONGO_MAINURI", "10.18.27.131:27017")
 MONGO_BACKUPURI = os.environ.get("MONGO_BACKUPURI", "10.65.51.237:27017")
 MONGO_DATABASE = os.environ.get("mongodb131name", "FHIR")
 MONGO_COLLECTION = os.environ.get("mongodb131coletion", "resources")
