@@ -1,7 +1,3 @@
-import datetime
-import xmltodict
-import numpy as np
-import base64
 import collections
 import os
 from io import StringIO
@@ -88,8 +84,6 @@ def ekg_opt_report(raw_data):
 
 
 def inference(filelike):
-    receive_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
     # 直接使用 AI 推論，移除所有模擬數據邏輯 (按照 oldstemi.py 的方式)
     filelike.seek(0)
     content = filelike.read()

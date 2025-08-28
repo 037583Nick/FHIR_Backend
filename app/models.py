@@ -1,11 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import create_engine, Session, select, JSON, Column, Integer
+from sqlmodel import JSON, Column, Integer
 from sqlalchemy.ext.asyncio.engine import create_async_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import Optional, Dict, AsyncGenerator
 from sqlmodel import SQLModel, Field
-import pymongo
 import pandas as pd
 from datetime import datetime
 import json
@@ -85,7 +84,7 @@ def datetimeConverter(item):
                     elif len(v) >= 20 and len(v) <= 30:
                         datetimeValue = pd.to_datetime(v)
                         item[k] = datetimeValue
-                except Exception as e:
+                except Exception:
                     pass
     elif isinstance(item, list):
         if len(item) < 10:
@@ -101,7 +100,7 @@ def datetimeConverter(item):
                         elif len(v) >= 20 and len(v) <= 30:
                             datetimeValue = pd.to_datetime(v)
                             item[i] = datetimeValue
-                    except Exception as e:
+                    except Exception:
                         pass
     return item
 
@@ -136,7 +135,7 @@ def get_mongo_client(database, collection):
             )
             _mongo_client.admin.command('ping')  # 測試主要連線
             _mongo_col = _mongo_client[database][collection]
-        except errors.ServerSelectionTimeoutError as e:
+        except errors.ServerSelectionTimeoutError:
             try:
                 # 嘗試連接到備援 MongoDB
                 _mongo_client = MongoClient(
@@ -147,7 +146,7 @@ def get_mongo_client(database, collection):
                 )
                 _mongo_client.admin.command('ping')  # 測試備援連線
                 _mongo_col = _mongo_client[database][collection]
-            except errors.ServerSelectionTimeoutError as e:
+            except errors.ServerSelectionTimeoutError:
                 raise  # 如果都無法連線則拋出異常
     return _mongo_col
 

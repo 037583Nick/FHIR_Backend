@@ -1,4 +1,3 @@
-import fhirclient.models.diagnosticreport as DR
 import fhirclient.models.servicerequest as SR
 import fhirclient.models.observation as OBS
 import fhirclient.models.fhirreference as fref
@@ -11,7 +10,7 @@ import base64
 import fitz
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 import pytz
 from fhirclient import server
 
@@ -72,7 +71,7 @@ def stemiInferencer(dr):
     page = doc.load_page(0)
 
     p = fitz.Point(10, 330)
-    rc = page.insert_text(
+    page.insert_text(
         p,  # bottom-left of 1st char
         report.replace("<br>", "\n"),  # the text (honors '\n')
     )

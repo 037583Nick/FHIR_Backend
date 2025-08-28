@@ -1,10 +1,7 @@
 from io import BytesIO
-from PIL import Image
-import base64
 import numpy as np
 import requests
 import os
-import grpc
 
 # 使用新版 tritonclient (舊版與新版 Triton Server 不兼容)
 try:

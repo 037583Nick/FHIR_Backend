@@ -23,15 +23,12 @@ from .routers import STEMI, admin
 # from .routers import Ekghome, iSEPS, iAST, iASTv2, sepsis
 # from .routers import CAD, CTCAE,ARDS,iIDeAS,NCCT,ARDS_infiltrate,PressureInjury,ICH,FlapDet,ARDS_new
 
-from sqlalchemy_utils import create_database,database_exists
-from sqlalchemy import exc
 from sqlmodel import SQLModel
 from fastapi.responses import JSONResponse
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import asyncpg
-import os
 import logging
 
 
@@ -275,7 +272,7 @@ async def init_main_database():
                     # print("主要資料庫資料表已存在，跳過創建")
                     pass
                     
-            except Exception as check_error:
+            except Exception:
                 # 如果檢查失敗，可能是表格不存在，直接創建
                 await conn.run_sync(SQLModel.metadata.create_all)
                 print("主要資料庫資料表創建成功")

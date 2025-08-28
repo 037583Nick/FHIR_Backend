@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Request, Path, Depends, Response, HTTPException, status
-from fhirclient import server
 import json
 import fhirclient.models.servicerequest as SR
 import fhirclient.models.diagnosticreport as DR
@@ -12,19 +11,14 @@ import fhirclient.models.coding as Coding
 
 from io import BytesIO
 import base64
-import fitz
 from PIL import Image, ImageDraw, ImageFont
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import pytz
 from app.fhir_processor import fhir_server
 from app.JWT import get_user, create_access_token
 from app.inference import stemiInf, STEMI_ICD_DICT
-from app.models import datetimeConverter, get_session, Resources,get_tryExcept_Moreinfo,mongo_client,mongo_client2
+from app.models import get_session, Resources
 from sqlalchemy.ext.asyncio import AsyncSession
-import os
-import pymongo
-from pymongo.errors import ServerSelectionTimeoutError
-import asyncio
 
 # 🚀 性能優化：應用啟動時快取 JSON 模板，避免每次檔案 I/O
 _CACHED_DR_TEMPLATE = None
@@ -76,9 +70,6 @@ async def inference(
 
     resp = sr.create(fhir_server)
     srid = resp["id"]
-
-    # 🚀 暫時停用 MongoDB 連線：直接跳過 MongoDB 儲存
-    mongo_col = None
 
     # 🚀 直接處理 contained 資料，簡化流程
     contained = {item.id: item for item in sr.contained}
@@ -151,12 +142,10 @@ async def inference(
             # Acute STEMI 情況
             norm_predicted = (stemi_sigmoid - thres) / (1 - thres) * 0.5 + 0.5
             stemi_display_prob = norm_predicted * 100
-            stemi_label = "Acute STEMI"
         else:
             # Not Acute STEMI 情況
             norm_predicted = (thres - stemi_sigmoid) / thres * 0.5 + 0.5
             stemi_display_prob = norm_predicted * 100
-            stemi_label = "Not Acute STEMI"
         
         # print(f"🔍 STEMI 最終計算: sigmoid={stemi_sigmoid:.6f}, 顯示={stemi_label}: {stemi_display_prob:.2f}%")
 
@@ -196,7 +185,6 @@ async def inference(
         try:
             # 調整字型大小以匹配新的圖像尺寸
             font_size_normal = 24  # 適合 1200px 寬度的字型
-            font_size_bold = 28
             
             font_normal = ImageFont.truetype("fonts/arial.ttf", font_size_normal)
         except:
@@ -322,7 +310,6 @@ async def inference(
         # 🎯 使用簡化的文字，而不是原始的冗長 report
         # 建立簡潔的結果文字
         disease = [i for i in raw_out.keys() if i != "STEMI"][0]
-        disease_prob = raw_out[disease] * 100
         
         # 🔧 使用完整的 report，與舊版一致
         obs.note[0].text = report.replace("<br>", "\n")

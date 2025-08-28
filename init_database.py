@@ -1,10 +1,8 @@
 import asyncio
 import asyncpg
-from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
-from app.models import base_engine, Account, Resources, hospital_info
+from app.models import base_engine, Account, hospital_info
 from app.JWT import get_password_hash
-import os
 from datetime import datetime
 
 class DatabaseManager:
